@@ -24,7 +24,7 @@ bool AbrirConexion()
 
 	if (!mysql_real_connect(mysqlConexion, host, usuario, contrasenia, nombreBaseDatos, puerto, NULL, 0))
 	{
-		printf_s("OCURRIO UN ERROR AL INTENTAR ABRIR LA CONEXION");
+		printf_s("OCURRIO UN ERROR AL INTENTAR ABRIR LA CONEXION, VERIFICAR SI EL GESTOR DE LA BASE DE DATOS ESTA EJECUTANDOSE.\n");
 
 		estadoConexion = false;
 		return estadoConexion;
@@ -41,22 +41,33 @@ void CerrarConexion()
 
 void ObtenerPersona()
 {
-	AbrirConexion();
+	if (!AbrirConexion())
+	{
+		return;
+	}
 
-	if (mysql_query(mysqlConexion, "SELECT * FROM Persona")) {
-		printf_s("OCURRIO UN ERROR AL INTENTAR CONSULTAR LA TABLA");
+	if (mysql_query(mysqlConexion, "SELECT PersonaId, UPPER(PersonaNombre) FROM Persona"))
+	{
+		printf_s("OCURRIO UN ERROR AL INTENTAR CONSULTAR LA TABLA DE PERSONAS");
+		return;
 	}
 
 	MYSQL_RES* result = mysql_store_result(mysqlConexion);
-	if (result == NULL)
+	if (result == NULL || result->row_count <= 0)
 	{
-		printf_s("OCURRIO UN ERROR AL INTENTAR LEER LOS DATOS DE LA TABLA");
+		printf_s("\033[31mNO TIENE PERSONAS AGREGADAS EN LA BASE DE DATOS\033[0m\n");
+		return;
 	}
 
+	extension.EncabezadoPersona();
 	MYSQL_ROW row;
 	while ((row = mysql_fetch_row(result)))
 	{
-		printf("%s %s %s\n", row[0], row[1], row[2]);
+		printf_s("\t\033[32m| %-*s | %-*s |\033[0m\n"
+			, extension.encabezado8_len
+			, row[0]
+			, extension.encabezado9_len
+			, row[1]);
 	}
 
 	mysql_free_result(result);
@@ -64,7 +75,7 @@ void ObtenerPersona()
 	CerrarConexion();
 }
 
-bool ObtenerIngreso()
+bool ObtenerIngreso(int pIdPersona)
 {
 	bool estadoObtenerIngreso = false;
 	if (!AbrirConexion())
@@ -74,23 +85,23 @@ bool ObtenerIngreso()
 
 	short int pTipoRegistro = 1;
 	char consulta[100];
-	sprintf_s(consulta, "CALL Sp_ObtenerIngresos(%d)", pTipoRegistro);
+	sprintf_s(consulta, "CALL Sp_ObtenerIngresos(%d, %d)", pTipoRegistro, pIdPersona);
 
 	if (mysql_query(mysqlConexion, consulta))
 	{
-		printf_s("\033[31mOCURRIO UN ERROR AL EJECUTAR EL PROCEDIMIENTO, ASEGURESE DE QUE EXISTA EN BASE DE DATOS\033[0m\n");
+		printf_s("\033[31mOCURRIO UN ERROR AL EJECUTAR EL PROCEDIMIENTO QUE OBTIENE INGRESOS, ASEGURESE DE QUE EXISTA EN BASE DE DATOS\033[0m\n");
 		return estadoObtenerIngreso;
 	}
 
 	MYSQL_RES* result = mysql_store_result(mysqlConexion);
 	if (result == NULL || result->row_count <= 0)
 	{
-		printf_s("\033[31mNO TIENE INGRESOS AGREGADOS EN LA BASE DE DATOS\033[0m\n");
+		printf_s("\033[31mNO TIENE INGRESOS AGREGADOS EN LA BASE DE DATOS O EL NUMERO DE PERSONA ES INCORRECTO\033[0m\n");
 		return estadoObtenerIngreso;
 	}
 
 	MYSQL_ROW row;
-	extension.Encabezado(1);
+	extension.Encabezado();
 	while ((row = mysql_fetch_row(result)))
 	{
 		printf_s("\t\033[32m| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\033[0m\n"
@@ -119,6 +130,43 @@ bool ObtenerIngreso()
 	CerrarConexion();
 
 	return estadoObtenerIngreso;
+}
+
+bool ObtenerTotalIngreso(int pTipoRegistro, int pIdPersona) 
+{
+	bool estadoObtenerIngreso = false;
+	if (!AbrirConexion())
+	{
+		return estadoObtenerIngreso;
+	};
+
+	char consulta[100];
+	sprintf_s(consulta, "CALL Sp_TotalIngresosEgresos(%d, %d)", pTipoRegistro, pIdPersona);
+
+	if (mysql_query(mysqlConexion, consulta))
+	{
+		printf_s("\033[31mOCURRIO UN ERROR AL EJECUTAR EL PROCEDIMIENTO QUE OBTIENE INGRESOS, ASEGURESE DE QUE EXISTA EN BASE DE DATOS\033[0m\n");
+		return estadoObtenerIngreso;
+	}
+
+	MYSQL_RES* result = mysql_store_result(mysqlConexion);
+	if (result == NULL || result->row_count <= 0)
+	{
+		printf_s("\033[31mNO TIENE INGRESOS AGREGADOS EN LA BASE DE DATOS O EL NUMERO DE PERSONA ES INCORRECTO\033[0m\n");
+		return estadoObtenerIngreso;
+	}
+
+	MYSQL_ROW row;
+
+	while ((row = mysql_fetch_row(result)))
+	{
+		printf_s("\n\t\033[32mTOTAL: %s\033[0m\n", row[0]);
+	}
+
+	mysql_free_result(result);
+
+	CerrarConexion();
+	
 }
 
 bool EliminarIngreso(int pIngresoEgresoId)
@@ -182,7 +230,7 @@ void MostrarSubMenu()
 
 			if (c == '\n')
 			{
-				ObtenerIngreso();
+				//ObtenerIngreso();
 			}
 			else
 			{
@@ -200,36 +248,51 @@ void MostrarSubMenu()
 
 void MostrarMenu()
 {
-	int opcion;
-
+	int opcion = 0;
+	int personaId = 0;
 	do
 	{
 		system("cls");
-
+		
 		printf("Seleccione una opcion:\n");
-		printf("1. Ver Ingresos\n");
-		printf("2. Salir\n");
+		printf("1. Ver Ingresos Por Persona\n");
+		printf("2. Ver Egresos Por Persona\n");
+		printf("3. Salir\n");
 
 		scanf_s("%d", &opcion);
 
 		switch (opcion) {
 		case 1:
-			if (!ObtenerIngreso())
+			ObtenerPersona();
+			printf_s("\nINGRESE UN NUMERO DE PERSONA: ");
+
+			scanf_s("%d", &personaId);
+
+			if (personaId == 0)
 			{
-				return;
+				printf_s("\nEL NUMERO DE PERSONA QUE INGRESO NO ES VALIDO\n");
+				system("pause>nul");
+				continue;
+			}
+			else
+			{
+				ObtenerIngreso(personaId);
+				ObtenerTotalIngreso(1, personaId);
 			}
 
-			MostrarSubMenu();
 			system("pause>nul");
 			break;
 		case 2:
+			ObtenerPersona();
+			break;
+		case 3:
 			printf("Ha seleccionado salir.\n");
 			break;
 		default:
 			printf("Opcion invalida. Por favor, seleccione una opcion valida.\n");
 			break;
 		}
-	} while (opcion != 2);
+	} while (opcion != 3);
 }
 
 int main()
