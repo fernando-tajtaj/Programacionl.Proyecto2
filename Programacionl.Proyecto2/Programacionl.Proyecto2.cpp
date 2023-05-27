@@ -1,6 +1,7 @@
 // Programacionl.Proyecto2.cpp : Este archivo contiene la función "main". La ejecución del programa comienza y termina ahí.
 //
 
+#include <stdio.h>
 #include <iostream>
 #include <string>
 #include <mysql.h>
@@ -16,6 +17,8 @@ unsigned int puerto = 3306;
 
 MYSQL* mysqlConexion;
 Extension extension;
+
+int numeroPersona = 0;
 
 bool AbrirConexion()
 {
@@ -63,6 +66,7 @@ void ObtenerPersona()
 	MYSQL_ROW row;
 	while ((row = mysql_fetch_row(result)))
 	{
+		numeroPersona++;
 		printf_s("\t\033[32m| %-*s | %-*s |\033[0m\n"
 			, extension.encabezado8_len
 			, row[0]
@@ -75,7 +79,7 @@ void ObtenerPersona()
 	CerrarConexion();
 }
 
-bool ObtenerIngreso(int pIdPersona)
+bool ObtenerIngresoEgreso(short int pTipoRegistro, int pIdPersona)
 {
 	bool estadoObtenerIngreso = false;
 	if (!AbrirConexion())
@@ -83,9 +87,8 @@ bool ObtenerIngreso(int pIdPersona)
 		return estadoObtenerIngreso;
 	};
 
-	short int pTipoRegistro = 1;
 	char consulta[100];
-	sprintf_s(consulta, "CALL Sp_ObtenerIngresos(%d, %d)", pTipoRegistro, pIdPersona);
+	sprintf_s(consulta, "CALL Sp_ObtenerIngresoEgreso(%d, %d)", pTipoRegistro, pIdPersona);
 
 	if (mysql_query(mysqlConexion, consulta))
 	{
@@ -132,7 +135,7 @@ bool ObtenerIngreso(int pIdPersona)
 	return estadoObtenerIngreso;
 }
 
-bool ObtenerTotalIngreso(int pTipoRegistro, int pIdPersona) 
+bool ObtenerTotalIngreso(int pTipoRegistro, int pIdPersona)
 {
 	bool estadoObtenerIngreso = false;
 	if (!AbrirConexion())
@@ -166,98 +169,23 @@ bool ObtenerTotalIngreso(int pTipoRegistro, int pIdPersona)
 	mysql_free_result(result);
 
 	CerrarConexion();
-	
-}
 
-bool EliminarIngreso(int pIngresoEgresoId)
-{
-	bool estadoEliminarIngreso = false;
-	if (!AbrirConexion())
-	{
-		return estadoEliminarIngreso;
-	};
-
-	char consulta[100];
-	sprintf_s(consulta, "CALL Sp_EliminarIngreso(%d)", pIngresoEgresoId);
-
-	if (mysql_query(mysqlConexion, consulta))
-	{
-		printf_s("\033[31mOCURRIO UN ERROR AL EJECUTAR EL PROCEDIMIENTO, ASEGURESE DE QUE EXISTA EN BASE DE DATOS\033[0m\n");
-		return estadoEliminarIngreso;
-	}
-
-	estadoEliminarIngreso = true;
-
-	CerrarConexion();
-
-	return estadoEliminarIngreso;
-}
-
-void MostrarSubMenu()
-{
-	int opcion;
-
-	do
-	{
-		int numeroIngreso = 0;
-		int c = 0;
-
-		printf("Seleccione una opcion:\n");
-		printf("1. Eliminar Ingreso por Id\n");
-		printf("2. Salir\n");
-
-		scanf_s("%d", &opcion);
-
-		switch (opcion)
-		{
-		case 1:
-
-			printf_s("INGRESA EL NUMERO DE REGISTRO A ELIMINAR: ");
-			scanf_s("%d", &numeroIngreso);
-
-			if (!EliminarIngreso(numeroIngreso))
-			{
-				printf_s("\nNO SE PUDO ELIMINAR EL NUMERO DE REGISTRO: %d", numeroIngreso);
-			}
-
-			printf_s("\nEL REGISTRO: %d SE HA ELIMINADO CORRECTAMENTE", numeroIngreso);
-
-			system("pause>nul");
-			printf_s("\nPRESIONE ENTER PARA REFRESCAR\n");
-			system("pause>nul");
-
-			c = getchar();
-
-			if (c == '\n')
-			{
-				//ObtenerIngreso();
-			}
-			else
-			{
-				opcion = 2;
-			}
-
-			break;
-		case 2:
-			printf("Ha seleccionado salir.\n");
-			break;
-		}
-
-	} while (opcion != 2);
 }
 
 void MostrarMenu()
 {
 	int opcion = 0;
+	char entrada[100];
 	int personaId = 0;
+
 	do
 	{
 		system("cls");
-		
-		printf("Seleccione una opcion:\n");
-		printf("1. Ver Ingresos Por Persona\n");
-		printf("2. Ver Egresos Por Persona\n");
-		printf("3. Salir\n");
+
+		printf("=== PROGRAMACION l - PROYECTO ll ===\n");
+		printf("\t1. VER INGRESOS\n");
+		printf("\t2. VER EGRESOS\n");
+		printf("\t3. SALIR\n");
 
 		scanf_s("%d", &opcion);
 
@@ -268,22 +196,74 @@ void MostrarMenu()
 
 			scanf_s("%d", &personaId);
 
-			if (personaId == 0)
+			if (scanf_s("%d", &personaId) != 0)
 			{
-				printf_s("\nEL NUMERO DE PERSONA QUE INGRESO NO ES VALIDO\n");
+				scanf_s("%s", entrada, sizeof(entrada));
+				printf_s("\033[31mERROR:SE INGRESO UNA LETRA EN LUGAR DE UN ENTERO\033[0m\n");
 				system("pause>nul");
 				continue;
 			}
-			else
+
+			if (personaId <= 0)
 			{
-				ObtenerIngreso(personaId);
-				ObtenerTotalIngreso(1, personaId);
+				printf_s("\033[31mEL NUMERO DE PERSONA QUE INGRESO NO ES VALIDO\033[0m\n");
+				system("pause>nul");
+				continue;
 			}
+
+			if (personaId > numeroPersona)
+			{
+				printf_s("\033[31mEL NUMERO DE PERSONA QUE INGRESO NO EXISTE EN EL LISTADO MOSTRADO\033[0m\n");
+				system("pause>nul");
+				continue;
+			}
+
+			if (!ObtenerIngresoEgreso(1, personaId))
+			{
+				system("pause>nul");
+				continue;
+			};
+
+			ObtenerTotalIngreso(1, personaId);
 
 			system("pause>nul");
 			break;
 		case 2:
 			ObtenerPersona();
+			printf_s("\nINGRESE UN NUMERO DE PERSONA: ");
+
+			scanf_s("%d", &personaId);
+
+			if (scanf_s("%s", entrada, sizeof(entrada)))
+			{
+				printf_s("\033[31mERROR:SE INGRESO UNA LETRA EN LUGAR DE UN ENTERO\033[0m\n");
+				system("pause>nul");
+				continue;
+			}
+
+			if (personaId <= 0)
+			{
+				printf_s("\033[31mERROR:EL NUMERO DE PERSONA QUE INGRESO NO ES VALIDO\033[0m\n");
+				system("pause>nul");
+				continue;
+			}
+
+			if (personaId > numeroPersona)
+			{
+				printf_s("\033[31mEL NUMERO DE PERSONA QUE INGRESO NO EXISTE EN EL LISTADO MOSTRADO\033[0m\n");
+				system("pause>nul");
+				continue;
+			}
+
+			if (!ObtenerIngresoEgreso(2, personaId))
+			{
+				system("pause>nul");
+				continue;
+			};
+
+			ObtenerTotalIngreso(2, personaId);
+
+			system("pause>nul");
 			break;
 		case 3:
 			printf("Ha seleccionado salir.\n");
