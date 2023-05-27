@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 26-05-2023 a las 04:48:05
+-- Tiempo de generación: 27-05-2023 a las 06:29:33
 -- Versión del servidor: 10.4.28-MariaDB
 -- Versión de PHP: 8.2.4
 
@@ -29,7 +29,7 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `Sp_EliminarIngreso` (IN `pIngresoEg
 FROM ingresoegreso
 WHERE IngresoEgresoId = pIngresoEgreso$$
 
-CREATE DEFINER=`root`@`localhost` PROCEDURE `Sp_ObtenerIngresos` (IN `pTipoRegistro` SMALLINT, IN `pIdPersona` INT)   SELECT
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Sp_ObtenerIngresoEgreso` (IN `pTipoRegistro` SMALLINT, IN `pIdPersona` INT)   SELECT
   	a.IngresoEgresoId AS IngresoEgresoNo
     , CASE 
     	WHEN a.IngresoEgresoTipo = 1 THEN 'INGRESO'
@@ -60,7 +60,12 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `Sp_ObtenerIngresos` (IN `pTipoRegis
 AND b.PersonaId = pIdPersona$$
 
 CREATE DEFINER=`root`@`localhost` PROCEDURE `Sp_TotalIngresosEgresos` (IN `pTipoRegistro` SMALLINT, IN `pIdPersona` INT)   SELECT
-	SUM(a.IngresoEgresoMonto)
+	CASE
+    	WHEN a.IngresoEgresoTipo = 1
+        	THEN CONVERT(SUM(a.IngresoEgresoMonto - (a.IngresoEgresoMonto*5)/100), DECIMAL(10,2))
+    	WHEN a.IngresoEgresoTipo = 2
+        	THEN CONVERT(SUM(a.IngresoEgresoMonto - (a.IngresoEgresoMonto*12)/100), DECIMAL(10,2))
+	END TotalIngresoEgresoMonto
 FROM ingresoegreso a
 WHERE a.IngresoEgresoTipo = pTipoRegistro
 AND a.IdPersona = pIdPersona$$
@@ -80,6 +85,13 @@ CREATE TABLE `ingresoegreso` (
   `IngresoEgresoFecha` date NOT NULL,
   `IdPersona` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `ingresoegreso`
+--
+
+INSERT INTO `ingresoegreso` (`IngresoEgresoId`, `IngresoEgresoTipo`, `IngresoEgresoMonto`, `IngresoEgresoFecha`, `IdPersona`) VALUES
+(1, 1, 2500.00, '2023-05-08', 1);
 
 -- --------------------------------------------------------
 
@@ -126,7 +138,7 @@ ALTER TABLE `persona`
 -- AUTO_INCREMENT de la tabla `ingresoegreso`
 --
 ALTER TABLE `ingresoegreso`
-  MODIFY `IngresoEgresoId` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `IngresoEgresoId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT de la tabla `persona`
